@@ -5,42 +5,100 @@ import Editor from './components/Editor';
 import Terminal from './components/Terminal';
 import Toolbar from './components/Toolbar';
 import Tabs from './components/Tabs';
-import { JavaFile, JavaFolder, ExecutionResult, ClipboardItem } from './types';
+import { JavaFile, JavaFolder, JavaProject, ExecutionResult, ClipboardItem } from './types';
 import { INITIAL_FILES, INITIAL_FOLDERS, NEW_FILE_TEMPLATE, getFileTypeInfo } from './constants';
 import { executeJavaCode } from './services/geminiService';
 
-const STORAGE_KEY = 'javacloud_v1_storage';
+const PROJECT_LIST_KEY = 'javacloud_projects_list';
+const ACTIVE_PROJECT_ID_KEY = 'javacloud_active_project_id';
 const SIDEBAR_WIDTH_KEY = 'javacloud_sidebar_width';
 
 const App: React.FC = () => {
-  // Load initial state from localStorage if available
-  const [folders, setFolders] = useState<JavaFolder[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+  // --- PROJECT MANAGEMENT ---
+  const [projects, setProjects] = useState<JavaProject[]>(() => {
+    const saved = localStorage.getItem(PROJECT_LIST_KEY);
     if (saved) {
-      try {
-        return JSON.parse(saved).folders;
-      } catch (e) { return INITIAL_FOLDERS; }
+      try { return JSON.parse(saved); } catch (e) { return []; }
     }
-    return INITIAL_FOLDERS;
+    return [{ id: 'default', name: 'Default Project', createdAt: Date.now() }];
   });
 
-  const [files, setFiles] = useState<JavaFile[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        return JSON.parse(saved).files;
-      } catch (e) { return INITIAL_FILES; }
-    }
-    return INITIAL_FILES;
+  const [activeProjectId, setActiveProjectId] = useState<string>(() => {
+    return localStorage.getItem(ACTIVE_PROJECT_ID_KEY) || 'default';
   });
 
+  // --- PROJECT DATA (FILES/FOLDERS) ---
+  const [folders, setFolders] = useState<JavaFolder[]>([]);
+  const [files, setFiles] = useState<JavaFile[]>([]);
+
+  // Refs for auto-saving
+  const stateRef = useRef({ files, folders });
+  useEffect(() => {
+    stateRef.current = { files, folders };
+  }, [files, folders]);
+
+  const saveCurrentProjectState = useCallback(() => {
+    const storageKey = `javacloud_project_data_${activeProjectId}`;
+    localStorage.setItem(storageKey, JSON.stringify(stateRef.current));
+  }, [activeProjectId]);
+
+  // Load project data when activeProjectId changes
+  useEffect(() => {
+    // 1. Reset file UI state to prevent state leaking between projects
+    setActiveFileId('');
+    setOpenFileIds([]);
+
+    const storageKey = `javacloud_project_data_${activeProjectId}`;
+    const saved = localStorage.getItem(storageKey);
+    
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        setFolders(data.folders || []);
+        setFiles(data.files || []);
+      } catch (e) {
+        setFolders([]);
+        setFiles([]);
+      }
+    } else {
+      // Initialize new project with default Main.java
+      const defaultFiles = [
+        {
+          id: Math.random().toString(36).substr(2, 9),
+          name: 'Main.java',
+          content: NEW_FILE_TEMPLATE('Main'),
+          updatedAt: Date.now(),
+          folderId: null
+        }
+      ];
+      setFolders([]);
+      setFiles(defaultFiles);
+    }
+    localStorage.setItem(ACTIVE_PROJECT_ID_KEY, activeProjectId);
+  }, [activeProjectId]);
+
+  // Persist project list
+  useEffect(() => {
+    localStorage.setItem(PROJECT_LIST_KEY, JSON.stringify(projects));
+  }, [projects]);
+
+  // --- UI STATE ---
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : 280;
   });
 
-  const [activeFileId, setActiveFileId] = useState<string>(files[0]?.id || '');
-  const [openFileIds, setOpenFileIds] = useState<string[]>(files[0] ? [files[0].id] : []);
+  const [activeFileId, setActiveFileId] = useState<string>('');
+  const [openFileIds, setOpenFileIds] = useState<string[]>([]);
+
+  // Auto-set active file when project finishes loading or files change
+  useEffect(() => {
+    if (files.length > 0 && !activeFileId) {
+      setActiveFileId(files[0].id);
+      setOpenFileIds([files[0].id]);
+    }
+  }, [files, activeFileId]);
+
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [terminalHeight, setTerminalHeight] = useState<number>(200);
@@ -51,22 +109,56 @@ const App: React.FC = () => {
 
   const activeFile = files.find(f => f.id === activeFileId) || null;
 
-  // Refs to always have current state inside the interval without re-subscribing the effect
-  const stateRef = useRef({ files, folders });
-  useEffect(() => {
-    stateRef.current = { files, folders };
-  }, [files, folders]);
-
   // Auto-save logic: Every 30 seconds
   useEffect(() => {
     const save = () => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateRef.current));
+      saveCurrentProjectState();
       setLastSaved(new Date());
     };
 
     const interval = setInterval(save, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [saveCurrentProjectState]);
+
+  const handleCreateProject = (name: string) => {
+    // Save current before switching
+    saveCurrentProjectState();
+
+    const newProject: JavaProject = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: name.trim() || 'Untitled Project',
+      createdAt: Date.now()
+    };
+    
+    // Update state
+    setProjects(prev => [...prev, newProject]);
+    setActiveProjectId(newProject.id);
+    
+    // Immediate save the new list to avoid race conditions
+    localStorage.setItem(PROJECT_LIST_KEY, JSON.stringify([...projects, newProject]));
+    setLastSaved(new Date());
+  };
+
+  const handleProjectSwitch = (id: string) => {
+    saveCurrentProjectState();
+    setActiveProjectId(id);
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    if (projects.length <= 1) {
+      alert("You must have at least one project.");
+      return;
+    }
+    if (!confirm("Are you sure you want to delete this project and all its files?")) return;
+    
+    setProjects(prev => prev.filter(p => p.id !== projectId));
+    localStorage.removeItem(`javacloud_project_data_${projectId}`);
+    
+    if (activeProjectId === projectId) {
+      const remaining = projects.filter(p => p.id !== projectId);
+      setActiveProjectId(remaining[0].id);
+    }
+  };
 
   const handleFileSelect = (id: string) => {
     setActiveFileId(id);
@@ -184,12 +276,6 @@ const App: React.FC = () => {
     setFolders(prev => prev.filter(f => !idsToDelete.includes(f.id)));
     setFiles(prev => {
       const remainingFiles = prev.filter(f => !f.folderId || !idsToDelete.includes(f.folderId));
-      const removedActive = activeFileId && !remainingFiles.find(f => f.id === activeFileId);
-      if (removedActive) {
-        const nextActive = remainingFiles[0]?.id || '';
-        setActiveFileId(nextActive);
-        setOpenFileIds(prevOpen => prevOpen.filter(pId => remainingFiles.some(rf => rf.id === pId)));
-      }
       return remainingFiles;
     });
   };
@@ -225,8 +311,7 @@ const App: React.FC = () => {
 
   const runCode = async () => {
     if (!activeFileId || !activeFile?.name.toLowerCase().endsWith('.java')) return;
-    // Immediate save before execution
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stateRef.current));
+    saveCurrentProjectState();
     setLastSaved(new Date());
     
     setIsRunning(true);
@@ -280,12 +365,16 @@ const App: React.FC = () => {
 
   return (
     <div className={`flex h-screen w-screen bg-[#1e1e1e] overflow-hidden font-sans ${isResizingSidebar ? 'cursor-col-resize select-none' : ''} ${isResizingTerminal ? 'cursor-row-resize select-none' : ''}`}>
-      {/* Side Panel (Explorer with Integrated Search) */}
       <div 
         className="flex flex-col border-r border-[#333] flex-shrink-0"
         style={{ width: `${sidebarWidth}px` }}
       >
         <Sidebar 
+          projects={projects}
+          activeProjectId={activeProjectId}
+          onProjectSelect={handleProjectSwitch}
+          onProjectCreate={handleCreateProject}
+          onProjectDelete={handleDeleteProject}
           files={files} 
           folders={folders}
           activeFileId={activeFileId} 
@@ -308,7 +397,6 @@ const App: React.FC = () => {
         />
       </div>
 
-      {/* Horizontal Resize Handle */}
       <div 
         className={`w-1 cursor-col-resize hover:bg-blue-500/50 transition-colors z-[70] flex-shrink-0 ${isResizingSidebar ? 'bg-blue-500' : 'bg-[#1e1e1e]'}`}
         onMouseDown={(e) => { e.preventDefault(); setIsResizingSidebar(true); }}
@@ -334,7 +422,7 @@ const App: React.FC = () => {
             <div className="flex-1 relative overflow-hidden bg-[#1e1e1e]">
               {activeFile ? (
                 <Editor 
-                  key={activeFile.id}
+                  key={`${activeProjectId}-${activeFile.id}`}
                   content={activeFile.content}
                   onChange={handleFileChange}
                   language={getFileTypeInfo(activeFile.name).language}
@@ -349,7 +437,6 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Vertical Resize Handle (Terminal) */}
           <div 
             className={`h-1 cursor-ns-resize hover:bg-blue-500/50 transition-colors z-[60] bg-[#333] ${isResizingTerminal ? 'bg-blue-500' : ''}`}
             onMouseDown={(e) => { e.preventDefault(); setIsResizingTerminal(true); }}

@@ -1,4 +1,10 @@
 
+export interface JavaProject {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
 export interface JavaFolder {
   id: string;
   name: string;

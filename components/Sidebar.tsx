@@ -1,9 +1,14 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { JavaFile, JavaFolder, ClipboardItem } from '../types';
+import { JavaFile, JavaFolder, JavaProject, ClipboardItem } from '../types';
 import { getFileTypeInfo } from '../constants';
 
 interface SidebarProps {
+  projects: JavaProject[];
+  activeProjectId: string;
+  onProjectSelect: (id: string) => void;
+  onProjectCreate: (name: string) => void;
+  onProjectDelete: (id: string) => void;
   files: JavaFile[];
   folders: JavaFolder[];
   activeFileId: string;
@@ -67,6 +72,7 @@ const ContextMenu: React.FC<{
 
 const Sidebar: React.FC<SidebarProps> = (props) => {
   const { 
+    projects, activeProjectId, onProjectSelect, onProjectCreate, onProjectDelete,
     files, folders, activeFileId, clipboard, 
     onFileSelect, onFileCreate, onFolderCreate, 
     onFileDelete, onFolderDelete, onToggleFolder, 
@@ -78,6 +84,11 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Project Manager State
+  const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
+  const [isAddingProject, setIsAddingProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+
   // File System State
   const [isCreatingFile, setIsCreatingFile] = useState<{parentId: string | null} | null>(null);
   const [isCreatingFolder, setIsCreatingFolder] = useState<{parentId: string | null} | null>(null);
@@ -87,6 +98,17 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeProject = useMemo(() => projects.find(p => p.id === activeProjectId), [projects, activeProjectId]);
+
+  const handleCreateProjectSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newProjectName.trim()) {
+      onProjectCreate(newProjectName.trim());
+      setNewProjectName('');
+      setIsAddingProject(false);
+      setIsProjectDropdownOpen(false);
+    }
+  };
 
   // Search Logic (Integrated Folders and Files)
   const searchResults = useMemo(() => {
@@ -272,8 +294,70 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
       className="bg-[#252526] h-full flex flex-col select-none overflow-hidden"
       onContextMenu={(e) => handleContextMenu(e, 'root', null)}
     >
+      {/* Project Selector Header */}
+      <div className="bg-[#1e1e1e] p-2 relative z-50">
+        <button 
+          onClick={() => {
+            setIsProjectDropdownOpen(!isProjectDropdownOpen);
+            setIsAddingProject(false);
+          }}
+          className="w-full flex items-center justify-between px-3 py-1.5 bg-[#252526] hover:bg-[#333] transition-colors rounded text-xs text-gray-300 font-semibold shadow-inner"
+        >
+          <div className="flex items-center truncate">
+            <i className="fas fa-layer-group mr-2 text-blue-500 opacity-70"></i>
+            <span className="truncate">{activeProject?.name || 'Select Project'}</span>
+          </div>
+          <i className={`fas fa-chevron-${isProjectDropdownOpen ? 'up' : 'down'} text-[10px] ml-2 opacity-50`}></i>
+        </button>
+
+        {isProjectDropdownOpen && (
+          <div className="absolute left-2 right-2 top-11 bg-[#252526] border border-[#454545] shadow-2xl rounded mt-1 overflow-hidden">
+            <div className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-[#333]">
+              {projects.map(p => (
+                <div key={p.id} className={`group flex items-center justify-between px-3 py-2 text-xs cursor-pointer ${p.id === activeProjectId ? 'bg-[#094771] text-white' : 'text-gray-400 hover:bg-[#2d2d2d]'}`}>
+                  <div className="flex-1 truncate" onClick={() => { onProjectSelect(p.id); setIsProjectDropdownOpen(false); }}>
+                    {p.name}
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onProjectDelete(p.id); }}
+                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-all ml-2"
+                  >
+                    <i className="fas fa-trash-alt text-[10px]"></i>
+                  </button>
+                </div>
+              ))}
+            </div>
+            
+            {isAddingProject ? (
+              <form onSubmit={handleCreateProjectSubmit} className="p-2 border-t border-[#333]">
+                <input
+                  autoFocus
+                  className="w-full bg-[#3c3c3c] text-white text-xs px-2 py-1.5 border border-blue-500 outline-none rounded-sm mb-2"
+                  placeholder="Project Name..."
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Escape' && setIsAddingProject(false)}
+                />
+                <div className="flex space-x-2">
+                  <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] py-1 rounded">Create</button>
+                  <button type="button" onClick={() => setIsAddingProject(false)} className="flex-1 bg-[#444] hover:bg-[#555] text-white text-[10px] py-1 rounded">Cancel</button>
+                </div>
+              </form>
+            ) : (
+              <button 
+                onClick={() => setIsAddingProject(true)}
+                className="w-full border-t border-[#333] px-3 py-2 text-xs text-blue-400 hover:bg-[#2d2d2d] transition-colors flex items-center justify-center"
+              >
+                <i className="fas fa-plus mr-2"></i>
+                Create Project
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="p-4 flex justify-between items-center border-b border-[#333]">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-gray-500">Explorer</h2>
+        <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Files</h2>
         <div className="flex items-center space-x-2">
           <button 
             onClick={() => setIsSearching(!isSearching)} 
