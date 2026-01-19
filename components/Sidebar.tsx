@@ -110,10 +110,6 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     }
   };
 
-<<<<<<< HEAD
-=======
-  // Search Logic (Integrated Folders and Files)
->>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
   const searchResults = useMemo(() => {
     if (!searchQuery || searchQuery.length < 2) return [];
     const query = searchQuery.toLowerCase();
@@ -146,7 +142,6 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     const isPasteDisabled = !clipboard;
     
     const baseActions = [
-<<<<<<< HEAD
       { label: 'New File', icon: 'fa-file-plus', onClick: () => {
           if (menu.id) {
             const f = folders.find(folder => folder.id === menu.id);
@@ -163,10 +158,6 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
           setIsCreatingFolder({ parentId: menu.id });
           setIsCreatingFile(null);
       }},
-=======
-      { label: 'New File', icon: 'fa-file-plus', onClick: () => setIsCreatingFile({ parentId: menu.id }) },
-      { label: 'New Folder', icon: 'fa-folder-plus', onClick: () => setIsCreatingFolder({ parentId: menu.id }) },
->>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
       { label: 'Paste', icon: 'fa-paste', disabled: isPasteDisabled, onClick: () => onPaste(menu.id) },
     ];
 
@@ -395,10 +386,6 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
         </div>
       </div>
 
-<<<<<<< HEAD
-=======
-      {/* Embedded Search Box */}
->>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
       {isSearching && (
         <div className="px-4 py-3 bg-[#252526] border-b border-[#333] shadow-md animate-in slide-in-from-top duration-200">
           <div className="relative group">
@@ -425,14 +412,6 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
               </button>
             </div>
           </div>
-<<<<<<< HEAD
-=======
-          {searchQuery && searchQuery.length >= 2 && (
-            <div className="mt-2 text-[10px] text-gray-500 font-medium">
-              Found {searchResults.length} match(es)
-            </div>
-          )}
->>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
         </div>
       )}
 
@@ -467,17 +446,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     >
                       <i className={`${icon} ${color} mr-2 text-xs w-4 text-center`}></i>
                       <span className="text-xs text-gray-300 truncate font-semibold">{res.name}</span>
-<<<<<<< HEAD
                     </div>
-=======
-                      {isFolder && <span className="ml-2 text-[10px] text-gray-600 uppercase font-bold tracking-tighter">(Folder)</span>}
-                    </div>
-                    {!isFolder && res.previewText && (
-                      <div className="pl-10 pr-4 py-0.5 text-[10px] text-gray-500 font-mono italic truncate opacity-80">
-                         {res.matchingLineIdx}: {res.previewText}
-                      </div>
-                    )}
->>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
                   </div>
                 );
               })
@@ -487,13 +456,6 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
               </div>
             )}
           </div>
-<<<<<<< HEAD
-=======
-        ) : isSearching ? (
-          <div className="px-4 py-10 text-center text-gray-600 text-xs italic">
-            Start typing to search...
-          </div>
->>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
         ) : (
           renderTree(null)
         )}
