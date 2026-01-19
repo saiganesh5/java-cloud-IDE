@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <div align="center">
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
@@ -13,6 +14,8 @@ View your app in AI Studio: https://ai.studio/apps/drive/1Su4Bigp4RcR28rALYEz-wb
 **Prerequisites:**  Node.js
 
 
+=======
+>>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
 1. Install dependencies:
    `npm install`
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key

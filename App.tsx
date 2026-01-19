@@ -7,7 +7,11 @@ import Toolbar from './components/Toolbar';
 import Tabs from './components/Tabs';
 import { JavaFile, JavaFolder, JavaProject, ExecutionResult, ClipboardItem } from './types';
 import { INITIAL_FILES, INITIAL_FOLDERS, NEW_FILE_TEMPLATE, getFileTypeInfo } from './constants';
+<<<<<<< HEAD
 import { executeJavaCode } from './services/javaExecutionService.ts';
+=======
+import { executeJavaCode } from './services/geminiService';
+>>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
 
 const PROJECT_LIST_KEY = 'javacloud_projects_list';
 const ACTIVE_PROJECT_ID_KEY = 'javacloud_active_project_id';
@@ -30,11 +34,29 @@ const App: React.FC = () => {
   // --- PROJECT DATA (FILES/FOLDERS) ---
   const [folders, setFolders] = useState<JavaFolder[]>([]);
   const [files, setFiles] = useState<JavaFile[]>([]);
+<<<<<<< HEAD
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load project data when activeProjectId changes
   useEffect(() => {
     setIsLoaded(false);
+=======
+
+  // Refs for auto-saving
+  const stateRef = useRef({ files, folders });
+  useEffect(() => {
+    stateRef.current = { files, folders };
+  }, [files, folders]);
+
+  const saveCurrentProjectState = useCallback(() => {
+    const storageKey = `javacloud_project_data_${activeProjectId}`;
+    localStorage.setItem(storageKey, JSON.stringify(stateRef.current));
+  }, [activeProjectId]);
+
+  // Load project data when activeProjectId changes
+  useEffect(() => {
+    // 1. Reset file UI state to prevent state leaking between projects
+>>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
     setActiveFileId('');
     setOpenFileIds([]);
 
@@ -51,6 +73,10 @@ const App: React.FC = () => {
         setFiles([]);
       }
     } else {
+<<<<<<< HEAD
+=======
+      // Initialize new project with default Main.java
+>>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
       const defaultFiles = [
         {
           id: Math.random().toString(36).substr(2, 9),
@@ -64,6 +90,7 @@ const App: React.FC = () => {
       setFiles(defaultFiles);
     }
     localStorage.setItem(ACTIVE_PROJECT_ID_KEY, activeProjectId);
+<<<<<<< HEAD
     setIsLoaded(true);
   }, [activeProjectId]);
 
@@ -76,6 +103,10 @@ const App: React.FC = () => {
     }
   }, [files, folders, activeProjectId, isLoaded]);
 
+=======
+  }, [activeProjectId]);
+
+>>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
   // Persist project list
   useEffect(() => {
     localStorage.setItem(PROJECT_LIST_KEY, JSON.stringify(projects));
@@ -90,6 +121,7 @@ const App: React.FC = () => {
   const [activeFileId, setActiveFileId] = useState<string>('');
   const [openFileIds, setOpenFileIds] = useState<string[]>([]);
 
+<<<<<<< HEAD
   // Auto-set active file when project finishes loading
   useEffect(() => {
     if (isLoaded && files.length > 0 && !activeFileId) {
@@ -97,6 +129,15 @@ const App: React.FC = () => {
       setOpenFileIds([files[0].id]);
     }
   }, [isLoaded, files.length, activeFileId]);
+=======
+  // Auto-set active file when project finishes loading or files change
+  useEffect(() => {
+    if (files.length > 0 && !activeFileId) {
+      setActiveFileId(files[0].id);
+      setOpenFileIds([files[0].id]);
+    }
+  }, [files, activeFileId]);
+>>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
 
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
   const [isRunning, setIsRunning] = useState<boolean>(false);
@@ -108,13 +149,32 @@ const App: React.FC = () => {
 
   const activeFile = files.find(f => f.id === activeFileId) || null;
 
+<<<<<<< HEAD
   const handleCreateProject = (name: string) => {
+=======
+  // Auto-save logic: Every 30 seconds
+  useEffect(() => {
+    const save = () => {
+      saveCurrentProjectState();
+      setLastSaved(new Date());
+    };
+
+    const interval = setInterval(save, 30000);
+    return () => clearInterval(interval);
+  }, [saveCurrentProjectState]);
+
+  const handleCreateProject = (name: string) => {
+    // Save current before switching
+    saveCurrentProjectState();
+
+>>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
     const newProject: JavaProject = {
       id: Math.random().toString(36).substr(2, 9),
       name: name.trim() || 'Untitled Project',
       createdAt: Date.now()
     };
     
+<<<<<<< HEAD
     setProjects(prev => [...prev, newProject]);
     setActiveProjectId(newProject.id);
   };
@@ -124,6 +184,23 @@ const App: React.FC = () => {
   };
 
   const handleProjectDelete = (projectId: string) => {
+=======
+    // Update state
+    setProjects(prev => [...prev, newProject]);
+    setActiveProjectId(newProject.id);
+    
+    // Immediate save the new list to avoid race conditions
+    localStorage.setItem(PROJECT_LIST_KEY, JSON.stringify([...projects, newProject]));
+    setLastSaved(new Date());
+  };
+
+  const handleProjectSwitch = (id: string) => {
+    saveCurrentProjectState();
+    setActiveProjectId(id);
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+>>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
     if (projects.length <= 1) {
       alert("You must have at least one project.");
       return;
@@ -178,9 +255,13 @@ const App: React.FC = () => {
     };
     setFiles(prev => [...prev, newFile]);
     handleFileSelect(newFile.id);
+<<<<<<< HEAD
     if (folderId) {
       setFolders(prev => prev.map(f => f.id === folderId ? { ...f, isOpen: true } : f));
     }
+=======
+    if (folderId) setFolders(prev => prev.map(f => f.id === folderId ? { ...f, isOpen: true } : f));
+>>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
   };
 
   const handleCreateFolder = (name: string, parentId: string | null) => {
@@ -190,6 +271,7 @@ const App: React.FC = () => {
       parentId,
       isOpen: true,
     };
+<<<<<<< HEAD
     setFolders(prev => {
       let updated = [...prev, newFolder];
       if (parentId) {
@@ -197,6 +279,9 @@ const App: React.FC = () => {
       }
       return updated;
     });
+=======
+    setFolders(prev => [...prev, newFolder]);
+>>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
   };
 
   const handleMoveItem = (id: string, type: 'file' | 'folder', targetFolderId: string | null) => {
@@ -253,6 +338,7 @@ const App: React.FC = () => {
     }
   };
 
+<<<<<<< HEAD
   const handleDeleteFolder = (folderId: string) => {
     if (!confirm("Delete folder and all its contents?")) return;
     
@@ -279,6 +365,20 @@ const App: React.FC = () => {
 
     // 3. Remove folders from state
     setFolders(prev => prev.filter(f => !idsToRemove.includes(f.id)));
+=======
+  const handleDeleteFolder = (id: string) => {
+    if (!confirm("Delete folder and all contents?")) return;
+    const getNestedFolderIds = (folderId: string): string[] => {
+      const children = folders.filter(f => f.parentId === folderId);
+      return [folderId, ...children.flatMap(c => getNestedFolderIds(c.id))];
+    };
+    const idsToDelete = getNestedFolderIds(id);
+    setFolders(prev => prev.filter(f => !idsToDelete.includes(f.id)));
+    setFiles(prev => {
+      const remainingFiles = prev.filter(f => !f.folderId || !idsToDelete.includes(f.folderId));
+      return remainingFiles;
+    });
+>>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
   };
 
   const handleRenameFolder = (id: string, newName: string) => {
@@ -312,6 +412,10 @@ const App: React.FC = () => {
 
   const runCode = async () => {
     if (!activeFileId || !activeFile?.name.toLowerCase().endsWith('.java')) return;
+<<<<<<< HEAD
+=======
+    saveCurrentProjectState();
+>>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
     setLastSaved(new Date());
     
     setIsRunning(true);
@@ -374,7 +478,11 @@ const App: React.FC = () => {
           activeProjectId={activeProjectId}
           onProjectSelect={handleProjectSwitch}
           onProjectCreate={handleCreateProject}
+<<<<<<< HEAD
           onProjectDelete={handleProjectDelete}
+=======
+          onProjectDelete={handleDeleteProject}
+>>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
           files={files} 
           folders={folders}
           activeFileId={activeFileId} 
@@ -420,11 +528,15 @@ const App: React.FC = () => {
               onClose={handleCloseFile}
             />
             <div className="flex-1 relative overflow-hidden bg-[#1e1e1e]">
+<<<<<<< HEAD
               {!isLoaded ? (
                 <div className="flex items-center justify-center h-full">
                    <i className="fas fa-spinner fa-spin text-3xl opacity-20"></i>
                 </div>
               ) : activeFile ? (
+=======
+              {activeFile ? (
+>>>>>>> 627c0e595ae442dd70aa71308c4bd808cb744986
                 <Editor 
                   key={`${activeProjectId}-${activeFile.id}`}
                   content={activeFile.content}
