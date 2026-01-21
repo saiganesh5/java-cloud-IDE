@@ -7,7 +7,7 @@ import Toolbar from './components/Toolbar';
 import Tabs from './components/Tabs';
 import { JavaFile, JavaFolder, JavaProject, ExecutionResult, ClipboardItem } from './types';
 import { INITIAL_FILES, INITIAL_FOLDERS, NEW_FILE_TEMPLATE, getFileTypeInfo } from './constants';
-import { executeJavaCode } from './services/geminiService';
+import { executeJavaCode } from './services/javaExecutionService';
 
 const PROJECT_LIST_KEY = 'javacloud_projects_list';
 const ACTIVE_PROJECT_ID_KEY = 'javacloud_active_project_id';
@@ -108,7 +108,7 @@ const App: React.FC = () => {
 
   const activeFile = files.find(f => f.id === activeFileId) || null;
 
-  const handleCreateProject = (name: string) => {
+  const handleCreateProject = useCallback((name: string) => {
     const newProject: JavaProject = {
       id: Math.random().toString(36).substr(2, 9),
       name: name.trim() || 'Untitled Project',
@@ -117,13 +117,13 @@ const App: React.FC = () => {
     
     setProjects(prev => [...prev, newProject]);
     setActiveProjectId(newProject.id);
-  };
+  }, []);
 
-  const handleProjectSwitch = (id: string) => {
+  const handleProjectSwitch = useCallback((id: string) => {
     setActiveProjectId(id);
-  };
+  }, []);
 
-  const handleProjectDelete = (projectId: string) => {
+  const handleProjectDelete = useCallback((projectId: string) => {
     if (projects.length <= 1) {
       alert("You must have at least one project.");
       return;
@@ -137,35 +137,34 @@ const App: React.FC = () => {
       const remaining = projects.filter(p => p.id !== projectId);
       setActiveProjectId(remaining[0].id);
     }
-  };
+  }, [projects, activeProjectId]);
 
-  const handleFileSelect = (id: string) => {
+  const handleFileSelect = useCallback((id: string) => {
     setActiveFileId(id);
-    if (!openFileIds.includes(id)) {
-      setOpenFileIds(prev => [...prev, id]);
-    }
-  };
+    setOpenFileIds(prev => prev.includes(id) ? prev : [...prev, id]);
+  }, []);
 
-  const handleCloseFile = (id: string) => {
-    const newOpenFiles = openFileIds.filter(fId => fId !== id);
-    setOpenFileIds(newOpenFiles);
-    
-    if (activeFileId === id) {
-      if (newOpenFiles.length > 0) {
-        setActiveFileId(newOpenFiles[newOpenFiles.length - 1]);
-      } else {
-        setActiveFileId('');
+  const handleCloseFile = useCallback((id: string) => {
+    setOpenFileIds(prev => {
+      const newOpenFiles = prev.filter(fId => fId !== id);
+      if (activeFileId === id) {
+        if (newOpenFiles.length > 0) {
+          setActiveFileId(newOpenFiles[newOpenFiles.length - 1]);
+        } else {
+          setActiveFileId('');
+        }
       }
-    }
-  };
+      return newOpenFiles;
+    });
+  }, [activeFileId]);
 
-  const handleFileChange = (content: string) => {
+  const handleFileChange = useCallback((content: string) => {
     setFiles(prev => prev.map(f => 
       f.id === activeFileId ? { ...f, content, updatedAt: Date.now() } : f
     ));
-  };
+  }, [activeFileId]);
 
-  const handleCreateFile = (name: string, folderId: string | null) => {
+  const handleCreateFile = useCallback((name: string, folderId: string | null) => {
     const isJava = name.toLowerCase().endsWith('.java');
     const className = name.replace(/\.java$/i, '').replace(/[^a-zA-Z0-9]/g, '_');
     
@@ -181,9 +180,9 @@ const App: React.FC = () => {
     if (folderId) {
       setFolders(prev => prev.map(f => f.id === folderId ? { ...f, isOpen: true } : f));
     }
-  };
+  }, [handleFileSelect]);
 
-  const handleCreateFolder = (name: string, parentId: string | null) => {
+  const handleCreateFolder = useCallback((name: string, parentId: string | null) => {
     const newFolder: JavaFolder = {
       id: Math.random().toString(36).substr(2, 9),
       name,
@@ -197,24 +196,26 @@ const App: React.FC = () => {
       }
       return updated;
     });
-  };
+  }, []);
 
-  const handleMoveItem = (id: string, type: 'file' | 'folder', targetFolderId: string | null) => {
+  const handleMoveItem = useCallback((id: string, type: 'file' | 'folder', targetFolderId: string | null) => {
     if (type === 'folder') {
       if (id === targetFolderId) return;
-      let current = targetFolderId;
-      while (current !== null) {
-        if (current === id) return;
-        const parent = folders.find(f => f.id === current)?.parentId;
-        current = parent || null;
-      }
-      setFolders(prev => prev.map(f => f.id === id ? { ...f, parentId: targetFolderId } : f));
+      setFolders(prev => {
+        let current = targetFolderId;
+        while (current !== null) {
+          if (current === id) return prev; // Avoid cycles
+          const parent = prev.find(f => f.id === current)?.parentId;
+          current = parent || null;
+        }
+        return prev.map(f => f.id === id ? { ...f, parentId: targetFolderId } : f);
+      });
     } else {
       setFiles(prev => prev.map(f => f.id === id ? { ...f, folderId: targetFolderId } : f));
     }
-  };
+  }, []);
 
-  const handlePaste = (targetFolderId: string | null) => {
+  const handlePaste = useCallback((targetFolderId: string | null) => {
     if (!clipboard) return;
     if (clipboard.action === 'cut') {
       handleMoveItem(clipboard.id, clipboard.type, targetFolderId);
@@ -251,41 +252,43 @@ const App: React.FC = () => {
         }
       }
     }
-  };
+  }, [clipboard, files, folders, handleFileSelect, handleMoveItem]);
 
-  const handleDeleteFolder = (folderId: string) => {
+  const handleDeleteFolder = useCallback((folderId: string) => {
     if (!confirm("Delete folder and all its contents?")) return;
     
-    // Find all descendant folder IDs using the current state directly
-    const getNestedFolderIds = (fid: string, all: JavaFolder[]): string[] => {
-      const children = all.filter(f => f.parentId === fid);
-      return [fid, ...children.flatMap(c => getNestedFolderIds(c.id, all))];
-    };
+    setFolders(prevFolders => {
+      // Find all nested IDs within the current functional update scope
+      const getNestedIds = (fid: string, all: JavaFolder[]): string[] => {
+        const children = all.filter(f => f.parentId === fid);
+        return [fid, ...children.flatMap(c => getNestedIds(c.id, all))];
+      };
 
-    const idsToRemove = getNestedFolderIds(folderId, folders);
+      const idsToRemove = getNestedIds(folderId, prevFolders);
 
-    // 1. Cleanup tabs and active file state for files inside these folders
-    const affectedFileIds = files
-      .filter(f => f.folderId && idsToRemove.includes(f.folderId))
-      .map(f => f.id);
+      // Remove files inside these folders and clean up tab UI state
+      setFiles(prevFiles => {
+        const affectedFileIds = prevFiles
+          .filter(f => f.folderId && idsToRemove.includes(f.folderId))
+          .map(f => f.id);
 
-    if (affectedFileIds.length > 0) {
-      setOpenFileIds(prev => prev.filter(id => !affectedFileIds.includes(id)));
-      setActiveFileId(prev => affectedFileIds.includes(prev) ? '' : prev);
-    }
+        if (affectedFileIds.length > 0) {
+          setOpenFileIds(prevTabs => prevTabs.filter(id => !affectedFileIds.includes(id)));
+          setActiveFileId(prevActive => affectedFileIds.includes(prevActive) ? '' : prevActive);
+        }
+        
+        return prevFiles.filter(f => !f.folderId || !idsToRemove.includes(f.folderId));
+      });
 
-    // 2. Remove files from state
-    setFiles(prev => prev.filter(f => !f.folderId || !idsToRemove.includes(f.folderId)));
+      return prevFolders.filter(f => !idsToRemove.includes(f.id));
+    });
+  }, []);
 
-    // 3. Remove folders from state
-    setFolders(prev => prev.filter(f => !idsToRemove.includes(f.id)));
-  };
-
-  const handleRenameFolder = (id: string, newName: string) => {
+  const handleRenameFolder = useCallback((id: string, newName: string) => {
     setFolders(prev => prev.map(f => f.id === id ? { ...f, name: newName } : f));
-  };
+  }, []);
 
-  const handleImportFiles = async (fileList: FileList) => {
+  const handleImportFiles = useCallback(async (fileList: FileList) => {
     const importedFiles: JavaFile[] = [];
     const readFiles = Array.from(fileList).map(file => {
       return new Promise<void>((resolve) => {
@@ -308,7 +311,7 @@ const App: React.FC = () => {
       setFiles(prev => [...prev, ...importedFiles]);
       handleFileSelect(importedFiles[0].id);
     }
-  };
+  }, [handleFileSelect]);
 
   const runCode = async () => {
     if (!activeFileId || !activeFile?.name.toLowerCase().endsWith('.java')) return;
