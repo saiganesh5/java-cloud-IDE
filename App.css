@@ -1,0 +1,32 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+.terminal-section {
+  border-top: 1px solid #333;
+}
+
+.output-terminal {
+  background: #111;
+  color: #eee;
+  padding: 10px;
+  height: 200px;
+  overflow: auto;
+}
+
+.input-box {
+  width: 100%;
+  background: #1e1e1e;
+  color: #fff;
+  border: none;
+  padding: 8px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  padding: 8px;
+}

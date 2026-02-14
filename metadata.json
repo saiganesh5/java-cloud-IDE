@@ -1,0 +1,5 @@
+{
+  "name": "JavaCloud IDE",
+  "description": "A professional-grade cloud-based Java development environment with integrated Monaco editor, file CRUD operations, and AI-powered code execution simulation.",
+  "requestFramePermissions": []
+}
