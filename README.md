@@ -148,3 +148,4 @@ Configuration can be found in `src/main/resources/application.properties`.
 Key properties:
 - `server.port`: Port on which the backend runs (default: 8080).
 - `spring.main.allow-bean-definition-overriding`: Set to `true`.
+<img src = "image.png"/>
